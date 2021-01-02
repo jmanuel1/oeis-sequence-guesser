@@ -60,35 +60,13 @@ function useSequenceNames(aNumbers) {
   const [loading, setLoading] = useState(true);
 
   // console.log(aNumbers);
-
-  useEffect(() => Papa.parse('/sequence-names.csv', {
-    delimiter: ' ',
-    download: true,
-    comments: true,
-    chunk(results, parser) {
-      parser.pause();
-      setSequenceNames(s => {
-        const copy = {...s};
-        for (let row of results.data) {
-          if (aNumbers.includes(row[0]))
-            copy[row[0]] = row.slice(1).join(' ');
-        }
-        // FIXME: Is this somewhow causing unending requests?
-        parser.resume();
-        return copy;
-      });
-    },
-    complete() {
-      setSequenceNames(s => {
-        const copy = {...s};
-        for (let aNumber in copy) {
-          copy[aNumber] = copy[aNumber].replace(/(A\d{6})/, m => `"${copy[m[1]]}"`);
-        }
-        setLoading(false);
-        return copy;
-      });
-    }
-  }), [aNumbers]);
+  useEffect(() => {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    loading && fetch('/oeis-sequence-names', { method: 'POST', body: JSON.stringify({ aNumbers }), headers }).then(response =>
+      response.json()
+    ).then(json => (setSequenceNames(json), setLoading(false)));
+  }, [aNumbers, loading]);
 
   return { sequenceNames, loading };
 }
