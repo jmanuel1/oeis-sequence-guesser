@@ -21,7 +21,7 @@ function Game({ sequences }) {
   const aNumbers = options.map(o => o[0].trim());
   const correctIndex = useRandomChoose(indices, 1).choices[0];
   const sequence = sequences[correctIndex].slice(1);
-  const sequenceHint = sequence.slice(0, 5);
+  const sequenceHint = sequence.slice(0, 10);
   const { sequenceNames, loading } = useSequenceNames(aNumbers);
   if (loading) {
     return <p>Downloading sequence names...</p>;
@@ -45,7 +45,7 @@ function useSequences() {
       download: true,
       comments: true,
       chunk(results) {
-        setSequences(s => s.concat(results.data));
+        setSequences(s => s.concat(results.data.slice(0, 11)));
       },
       complete() {
         setLoading(false);
@@ -59,19 +59,22 @@ function useSequenceNames(aNumbers) {
   const [sequenceNames, setSequenceNames] = useState({});
   const [loading, setLoading] = useState(true);
 
-  console.log(aNumbers);
+  // console.log(aNumbers);
 
   useEffect(() => Papa.parse('/sequence-names.csv', {
     delimiter: ' ',
     download: true,
     comments: true,
-    chunk(results) {
+    chunk(results, parser) {
+      parser.pause();
       setSequenceNames(s => {
         const copy = {...s};
         for (let row of results.data) {
           if (aNumbers.includes(row[0]))
             copy[row[0]] = row.slice(1).join(' ');
         }
+        // FIXME: Is this somewhow causing unending requests?
+        parser.resume();
         return copy;
       });
     },
