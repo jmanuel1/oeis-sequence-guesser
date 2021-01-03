@@ -15,23 +15,31 @@ function App() {
   );
 }
 
+// const timer = makeTimer
 function Game({ sequences }) {
   const randomSequences = useRandomChoose(sequences);
   const { choices: options, indices, rerandomize: rerandomizeSequences } = randomSequences;
   const aNumbers = useMemo(() => options.map(o => o[0].trim()), [options]);
   const correctIndex = useRandomChoose(indices, 1).choices[0];
   const sequence = sequences[correctIndex].slice(1).map(a => +a);
-  const sequenceHint = sequence.slice(0, 10);
+  const [sequenceHintLength, setSequenceHintLength] = useState(10);
+  const sequenceHint = sequence.slice(0, sequenceHintLength);
   const { sequenceNames, loading } = useSequenceNames(aNumbers);
   const [ game, setGame ] = useState('which-sequence');
   const [ nextTerm, setNextTerm ] = useState(0);
   const [ answerIsCorrect, setAnswerIsCorrect ] = useState(null);
+  const timer = useTimer();
   if (loading) {
     return <p>Downloading sequence names...</p>;
   }
 
   function onChooseGame(event) {
-    setGame(event.target.id);
+    const newGame = event.target.id;
+    setGame(newGame);
+    if (newGame === 'terms-within-time') {
+      timer.reset(60);
+      timer.start();
+    }
   }
 
   function onTermChange(event) {
@@ -68,10 +76,33 @@ function Game({ sequences }) {
       <p>What's the next term?</p>
       <input onChange={onTermChange} default={0} value={nextTerm} />
       <button onClick={onSubmitNextTerm}>Submit Answer</button>
+    </>,
+    'terms-within-time': <>
+      <p>Time left: {timer.timeLeft().toFixed(1)} seconds</p>
+      <p>Sequence starts with: <strong>{sequenceHint.join(' ')}</strong></p>
+      <p>What's the next term?</p>
+      <input onChange={onTermChange} default={0} value={nextTerm} disabled={timer.timeLeft() <= 0} />
+      <button onClick={onSubmitNextTerm} disabled={timer.timeLeft() <= 0}>Submit Answer</button>
     </>
   }
 
+  const mainGameComponent = <>
+    {games[game]}
+    <input type='radio' name='game' id='next-term' onChange={onChooseGame} checked={game === 'next-term'}/>
+    <label htmlFor='next-term'>Next Term Game</label>
+    <input type='radio' name='game' id='which-sequence' onChange={onChooseGame} checked={game === 'which-sequence'} />
+    <label htmlFor='which-sequence'>Guess the Sequence Game</label>
+    <input type='radio' name='game' id='terms-within-time' onChange={onChooseGame} checked={game === 'terms-within-time'} />
+    <label htmlFor='terms-within-time'>Guess Terms Within Time Limit Game</label>
+  </>;
+
   if (answerIsCorrect !== null) {
+    if (game === 'terms-within-time') {
+      if (answerIsCorrect) {
+        setSequenceHintLength(sequenceHintLength + 1);
+      }
+      return mainGameComponent;
+    }
     return (
       <>
         <p>{answerIsCorrect ? 'Right Answer!' : 'Incorrect Answer'}</p>
@@ -80,15 +111,7 @@ function Game({ sequences }) {
     );
   }
 
-  return (
-    <>
-      {games[game]}
-      <input type='radio' name='game' id='next-term' onChange={onChooseGame} checked={game === 'next-term'}/>
-      <label htmlFor='next-term'>Next Term Game</label>
-      <input type='radio' name='game' id='which-sequence' onChange={onChooseGame} checked={game === 'which-sequence'} />
-      <label htmlFor='which-sequence'>Guess the Sequence Game</label>
-    </>
-  );
+  return mainGameComponent;
 }
 
 function useSequences() {
@@ -142,6 +165,73 @@ function useRandomChoose(array, count = 4) {
     rerandomize
   };
 }
+
+function useTimer() {
+  const [limit, setLimit] = useState(60);
+  const [handle, setHandle] = useState(null);
+  const [startTimestamp, setStartTimestamp] = useState(null);
+  const [elapsedMilliseconds, setElapsedMilliseconds] = useState(0);
+  function tick(timestamp) {
+    if (startTimestamp === null) {
+      setStartTimestamp(timestamp);
+    } else {
+      setElapsedMilliseconds(timestamp - startTimestamp);
+    }
+  };
+  const timer = {
+    reset(seconds) {
+      setLimit(seconds);
+      if (handle !== null) {
+        cancelAnimationFrame(handle);
+        setHandle(null);
+      }
+      setStartTimestamp(null);
+      setElapsedMilliseconds(0);
+    },
+    start() {
+      setHandle(requestAnimationFrame(tick));
+    },
+    timeLeft() { return Math.max(limit - elapsedMilliseconds/1000, 0); }
+  };
+  if (handle !== null && timer.timeLeft() > 0) {
+    requestAnimationFrame(tick);
+  }
+
+  return timer;
+}
+
+// function useTimer() {
+//   const [limit, setLimit] = useState(60);
+//   const [handle, setHandle] = useState(null);
+//   const [timer, setTimer] = useState({
+//     reset(seconds) {
+//       setLimit(seconds);
+//       if (handle !== null) {
+//         cancelAnimationFrame(handle);
+//       }
+//     },
+//     start() {
+//       setHandle(requestAnimationFrame(tickWrapper(null, 0, this, limit)));
+//     },
+//     timeLeft() { return limit; }
+//   });
+//   function tickWrapper(startTimestamp, elapsedMilliseconds, timer, limit) {
+//     timer.timeLeft = function timeLeft() {
+//       return limit - elapsedMilliseconds/1000;
+//     };
+//     return function tick(timestamp) {
+//       if (startTimestamp === null) {
+//         startTimestamp = timestamp;
+//       } else {
+//         elapsedMilliseconds = timestamp - startTimestamp;
+//       }
+//       if (timer.timeLeft() > 0) {
+//         requestAnimationFrame(tickWrapper(startTimestamp, elapsedMilliseconds, timer, limit));
+//       }
+//     };
+//   }
+//   return timer;
+// }
 
 function randomChoose(array, count = 4) {
   const indices = [];
