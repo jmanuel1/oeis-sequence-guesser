@@ -1,7 +1,7 @@
 import logo from './logo.svg';
 import './App.css';
 import Papa from 'papaparse';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
 function App() {
   const { sequences, loading } = useSequences();
@@ -9,7 +9,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        {loading ? loadingMessage : <Game sequences={sequences} />}
+        {loading ? loadingMessage : <Game sequences={sequences}/>}
       </header>
     </div>
   );
@@ -17,22 +17,76 @@ function App() {
 
 function Game({ sequences }) {
   const randomSequences = useRandomChoose(sequences);
-  const { choices: options, indices } = randomSequences;
-  const aNumbers = options.map(o => o[0].trim());
+  const { choices: options, indices, rerandomize: rerandomizeSequences } = randomSequences;
+  const aNumbers = useMemo(() => options.map(o => o[0].trim()), [options]);
   const correctIndex = useRandomChoose(indices, 1).choices[0];
-  const sequence = sequences[correctIndex].slice(1);
+  const sequence = sequences[correctIndex].slice(1).map(a => +a);
   const sequenceHint = sequence.slice(0, 10);
   const { sequenceNames, loading } = useSequenceNames(aNumbers);
+  const [ game, setGame ] = useState('which-sequence');
+  const [ nextTerm, setNextTerm ] = useState(0);
+  const [ answerIsCorrect, setAnswerIsCorrect ] = useState(null);
   if (loading) {
     return <p>Downloading sequence names...</p>;
   }
 
-  return (
-    <>
+  function onChooseGame(event) {
+    setGame(event.target.id);
+  }
+
+  function onTermChange(event) {
+    const value = +event.target.value;
+    if (Number.isNaN(value)) {
+      return;
+    }
+    setNextTerm(value);
+  }
+
+  function onSubmitNextTerm() {
+    const correctNextTerm = sequence[10];
+    if (nextTerm === correctNextTerm) {
+      setAnswerIsCorrect(true);
+    } else {
+      setAnswerIsCorrect(false);
+    }
+  }
+
+  function resetGame() {
+    setAnswerIsCorrect(null);
+    rerandomizeSequences();
+  }
+
+  const games = {
+    'which-sequence': <>
       <p>Sequence starts with: <strong>{sequenceHint.join(' ')}</strong></p>
       <ol>
         {aNumbers.map(a => <li>{sequenceNames[a]}</li>)}
       </ol>
+    </>,
+    'next-term': <>
+      <p>Sequence starts with: <strong>{sequenceHint.join(' ')}</strong></p>
+      <p>What's the next term?</p>
+      <input onChange={onTermChange} default={0} value={nextTerm} />
+      <button onClick={onSubmitNextTerm}>Submit Answer</button>
+    </>
+  }
+
+  if (answerIsCorrect !== null) {
+    return (
+      <>
+        <p>{answerIsCorrect ? 'Right Answer!' : 'Incorrect Answer'}</p>
+        <button onClick={resetGame}>Next Question</button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {games[game]}
+      <input type='radio' name='game' id='next-term' onChange={onChooseGame} checked={game === 'next-term'}/>
+      <label htmlFor='next-term'>Next Term Game</label>
+      <input type='radio' name='game' id='which-sequence' onChange={onChooseGame} checked={game === 'which-sequence'} />
+      <label htmlFor='which-sequence'>Guess the Sequence Game</label>
     </>
   );
 }
@@ -63,7 +117,7 @@ function useSequenceNames(aNumbers) {
   useEffect(() => {
     const headers = new Headers();
     headers.set('Content-Type', 'application/json');
-    loading && fetch('/oeis-sequence-names', { method: 'POST', body: JSON.stringify({ aNumbers }), headers }).then(response =>
+    fetch('/oeis-sequence-names', { method: 'POST', body: JSON.stringify({ aNumbers }), headers }).then(response =>
       response.json()
     ).then(json => (setSequenceNames(json), setLoading(false)));
   }, [aNumbers, loading]);
@@ -73,12 +127,20 @@ function useSequenceNames(aNumbers) {
 
 function useRandomChoose(array, count = 4) {
   const [choices, setChoices] = useState(null);
-  if (choices === null) {
+  const [oldParams, setOldParams] = useState({ array, count });
+  function rerandomize() {
+    setChoices(randomChoose(array, count));
+  }
+  if (choices === null || array !== oldParams.array || count !== oldParams.count) {
     const c = randomChoose(array, count);
     setChoices(c);
-    return c;
+    setOldParams({ array, count });
+    return {...c, rerandomize};
   }
-  return choices;
+  return {
+    ...choices,
+    rerandomize
+  };
 }
 
 function randomChoose(array, count = 4) {
