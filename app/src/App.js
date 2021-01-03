@@ -68,7 +68,9 @@ function Game({ sequences }) {
     'which-sequence': <>
       <p>Sequence starts with: <strong>{sequenceHint.join(' ')}</strong></p>
       <ol>
-        {aNumbers.map(a => <li>{sequenceNames[a]}</li>)}
+        {aNumbers.map(a => {
+          return sequenceNames[a] ? <li>{sequenceNames[a].name}<br />{sequenceNames[a].where}</li> : <li>Data missing (oops)</li>
+        })}
       </ol>
     </>,
     'next-term': <>
@@ -122,7 +124,7 @@ function useSequences() {
       download: true,
       comments: true,
       chunk(results) {
-        setSequences(s => s.concat(results.data.slice(0, 11)));
+        setSequences(s => s.concat(results.data));
       },
       complete() {
         setLoading(false);
@@ -199,39 +201,6 @@ function useTimer() {
 
   return timer;
 }
-
-// function useTimer() {
-//   const [limit, setLimit] = useState(60);
-//   const [handle, setHandle] = useState(null);
-//   const [timer, setTimer] = useState({
-//     reset(seconds) {
-//       setLimit(seconds);
-//       if (handle !== null) {
-//         cancelAnimationFrame(handle);
-//       }
-//     },
-//     start() {
-//       setHandle(requestAnimationFrame(tickWrapper(null, 0, this, limit)));
-//     },
-//     timeLeft() { return limit; }
-//   });
-//   function tickWrapper(startTimestamp, elapsedMilliseconds, timer, limit) {
-//     timer.timeLeft = function timeLeft() {
-//       return limit - elapsedMilliseconds/1000;
-//     };
-//     return function tick(timestamp) {
-//       if (startTimestamp === null) {
-//         startTimestamp = timestamp;
-//       } else {
-//         elapsedMilliseconds = timestamp - startTimestamp;
-//       }
-//       if (timer.timeLeft() > 0) {
-//         requestAnimationFrame(tickWrapper(startTimestamp, elapsedMilliseconds, timer, limit));
-//       }
-//     };
-//   }
-//   return timer;
-// }
 
 function randomChoose(array, count = 4) {
   const indices = [];

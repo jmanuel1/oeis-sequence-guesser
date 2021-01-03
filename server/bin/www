@@ -7,6 +7,9 @@
 var app = require('../app');
 var debug = require('debug')('server:server');
 var http = require('http');
+let fs = require('fs');
+let path = require('path');
+let Papa = require('papaparse');
 
 /**
  * Get port from environment and store in Express.
@@ -25,9 +28,112 @@ var server = http.createServer(app);
  * Listen on provided port, on all network interfaces.
  */
 
-server.listen(port);
-server.on('error', onError);
-server.on('listening', onListening);
+const sequenceNames = {};
+fs.readFile(path.join(__dirname, '../public/sequence-names.csv'), 'utf-8', (err, data) => {
+ if (err) {
+   console.error(err);
+   return;
+ }
+ console.log(data.slice(-100));
+ console.error('is 1250 there?', data.match(/^A001250/gm));
+ try {
+   // const rows = data.split('\n').map(r => r.trim()).filter(r => r.length).map(r => r.split(' '));
+   //     for (let row of results.data) {
+   //       if (row[0].includes('A00125')) {
+   //         console.log('found A00125*', JSON.stringify(row[0]));
+   //       }
+   //       if (!row[0] || !row[0].match(/A\d{6}/))
+   //         console.log('row', row);
+   //       sequenceNames[row[0]] = { name: row.slice(1).join(' ') };
+   //       const references = sequenceNames[row[0]].name.match(/A\d{6}/g);
+   //       sequenceNames[row[0]].references = references || [];
+   //     }
+   //     // FIXME: Is this somewhow causing unending requests?
+   //     // parser.resume();
+   //   },
+   //   complete() {
+   //     console.log(JSON.stringify(sequenceNames).slice(-100));
+   //     for (let aNumber in sequenceNames) {
+   //       // console.log(sequenceNames[aNumber])
+   //       if (sequenceNames[aNumber].references.length === 0) {
+   //         sequenceNames[aNumber].where = '';
+   //         continue;
+   //       }
+   //       sequenceNames[aNumber].where = 'where';
+   //       for (let reference of sequenceNames[aNumber].references) {
+   //         if (!sequenceNames[reference]) {
+   //           // console.log(reference);
+   //           continue;
+   //         }
+   //         sequenceNames[aNumber].where += ` ${reference} is ${sequenceNames[reference].name}\n`;
+   //         for (let chainRef of sequenceNames[reference].references) {
+   //           if (!sequenceNames[aNumber].references.includes(chainRef))
+   //             sequenceNames[aNumber].references.push(chainRef);
+   //         }
+   //       }
+   //     }
+   //     server.listen(port);
+   //     server.on('error', onError);
+   //     server.on('listening', onListening);
+   //     app.set('sequence names', sequenceNames);
+   //   }
+   // });
+   //
+   //
+   Papa.parse(data, {
+     delimiter: ' ',
+     comments: true,
+     worker: false,
+     preview: 0,
+     skipEmptyLines: 'greedy',
+     chunk(results, parser) {
+       // parser.pause();
+       console.log('aborted?', results.meta.aborted);
+       console.error('parse errors', parser.errors);
+       for (let row of results.data) {
+         if (row[0].includes('A00125')) {
+           console.log('found A00125*', JSON.stringify(row[0]));
+         }
+         if (!row[0] || !row[0].match(/A\d{6}/))
+           console.log('row', row);
+         sequenceNames[row[0]] = { name: row.slice(1).join(' ') };
+         const references = sequenceNames[row[0]].name.match(/A\d{6}/g);
+         sequenceNames[row[0]].references = references || [];
+       }
+       // FIXME: Is this somewhow causing unending requests?
+       // parser.resume();
+     },
+     complete() {
+       console.log(JSON.stringify(sequenceNames).slice(-100));
+       for (let aNumber in sequenceNames) {
+         // console.log(sequenceNames[aNumber])
+         if (sequenceNames[aNumber].references.length === 0) {
+           sequenceNames[aNumber].where = '';
+           continue;
+         }
+         sequenceNames[aNumber].where = 'where';
+         for (let reference of sequenceNames[aNumber].references) {
+           if (!sequenceNames[reference]) {
+             // console.log(reference);
+             continue;
+           }
+           sequenceNames[aNumber].where += ` ${reference} is ${sequenceNames[reference].name}\n`;
+           for (let chainRef of sequenceNames[reference].references) {
+             if (!sequenceNames[aNumber].references.includes(chainRef))
+               sequenceNames[aNumber].references.push(chainRef);
+           }
+         }
+       }
+       server.listen(port);
+       server.on('error', onError);
+       server.on('listening', onListening);
+       app.set('sequence names', sequenceNames);
+     }
+   });
+ } catch (error) {
+   console.error(error);
+ }
+});
 
 /**
  * Normalize a port into a number, string, or false.

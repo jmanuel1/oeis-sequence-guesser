@@ -25,44 +25,11 @@ app.use('/', indexRouter);
 app.use('/users', usersRouter);
 app.post('/oeis-sequence-names', function(req, res, next) {
   const aNumbers = req.body.aNumbers;
-  const sequenceNames = {};
-  fs.readFile(path.join(__dirname, 'public/sequence-names.csv'), 'utf-8', (err, data) => {
-    if (err) {
-      console.error(err);
-      next(createError(500));
-      return;
-    }
-    // console.log(data);
-    try {
-      Papa.parse(data, {
-        delimiter: ' ',
-        comments: true,
-        worker: false,
-        chunk(results, parser) {
-          // parser.pause();
-          for (let row of results.data) {
-            if (aNumbers.includes(row[0])) {
-              sequenceNames[row[0]] = row.slice(1).join(' ');
-              // const references = [...copy[row[0]].matchAll(/A\d{6}/g)
-              // for (let reference of references) {
-              //
-              }
-          }
-          // FIXME: Is this somewhow causing unending requests?
-          // parser.resume();
-        },
-        complete() {
-          for (let aNumber in sequenceNames) {
-            sequenceNames[aNumber] = sequenceNames[aNumber].replace(/(A\d{6})/g, m => `"${sequenceNames[m[1]]}"`);
-          }
-          res.send(JSON.stringify(sequenceNames));
-        }
-      });
-    } catch (error) {
-      console.error(error);
-      next(createError(500));
-    }
-  });
+  const names = {};
+  for (let a of aNumbers) {
+    names[a] = app.get('sequence names')[a];
+  }
+  return res.send(JSON.stringify(names));
 })
 
 // catch 404 and forward to error handler
